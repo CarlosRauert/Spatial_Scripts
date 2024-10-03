@@ -2,7 +2,8 @@ library(Seurat)
 library(spacexr)
 library(nicheDE)
 library(data.table)
-
+library(Matrix)
+library(parallel)
 xR <- 1
 
 Args <- commandArgs(trailingOnly=TRUE)
@@ -50,6 +51,31 @@ rownames(DummyMatrix)<-DummyMatrix$Barcode
 DummyMatrix<-DummyMatrix[,-c(1)]
 DummyMatrix <- as.matrix(DummyMatrix)
 
+# Create Average Expression Profile Matrix from Xenium
+
+annotations.df <- RCTD_xR@results$results_df
+annotations <- annotations.df$first_type
+names(annotations) <- rownames(annotations.df)
+SeuratObj$predicted.celltype <- annotations
+keep.cells <- Cells(SeuratObj)[!is.na(SeuratObj$predicted.celltype)]
+SeuratObj <- subset(SeuratObj, cells = keep.cells)
+
+
+Idents(SeuratObj) <- SeuratObj$predicted.celltype 
+#get average expression profile matrix 
+#create library matrix
+query.counts<- GetAssayData(SeuratObj, assay = "Xenium", slot = "counts")[, Cells(SeuratObj[["fov"]])]
+
+SeuratObj_predicted.celltype <- as.data.table(names(SeuratObj$predicted.celltype ))
+SeuratObj_predicted.celltype[, celltype:= SeuratObj$predicted.celltype]
+aveExpL= CreateLibraryMatrix(t(query.counts),SeuratObj_predicted.celltype)
+
+idx<- sapply(colnames(RCTD_weights), function(xr){
+  which(rownames(aveExpL)  == xr)
+})
+aveExpL_sort <- aveExpL[idx, ]
+
+
 # Create Average Expression Profile Matrix (Such that Celltypes and Features which are in the reference but not in Xenium are not used)
 
 predicted.celltype <- as.data.frame(as.data.table(Ref_Raw$wat.im_pred, names(Ref_Raw$wat.im_pred), row.names=NULL))
@@ -93,13 +119,17 @@ Kernel <- floor(AvgDistRectangle(Coordinates_Mat_Cropped))
 Kernel.lower <- floor(Kernel/10)
 Kernel.upper <- floor(Kernel*3)
 
-NicheDE_Obj <- CreateNicheDEObject(Counts_Mat_Cropped, Coordinates_Mat_Cropped, aveExpL, RCTD_weights_sorted, c(Kernel.lower,Kernel,Kernel.upper))
+#NicheDE_Obj <- CreateNicheDEObject(Counts_Mat_Cropped, Coordinates_Mat_Cropped, aveExpL_sort, RCTD_weights, c(Kernel.lower,Kernel,Kernel.upper))
+NicheDE_Obj <- CreateNicheDEObject(Counts_Mat, Coordinates_Mat, aveExpL_sort, RCTD_weights, c(2,22,66))
 
 NicheDE_Obj = CalculateEffectiveNicheLargeScale(NicheDE_Obj,batch_size = 1000, cutoff = 0.05)
 
+saveRDS(NicheDE_Obj, paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241003_NicheDE_Obj_PostEffNiche/20241003_NDE_PostEffNiche_R",xR,".rds"))
+
+NicheDE_Obj <- readRDS(paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241003_NicheDE_Obj_PostEffNiche/20241003_NDE_PostEffNiche_R",xR,".rds"))
 # Perform Niche-DE
 
-NicheDE_Obj = niche_DE(NicheDE_Obj, outfile=paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241001_NicheDE/20240924_NicheDE_Out_Region",xR,".txt"), num_cores = 16, batch = T)
+NicheDE_Obj = niche_DE(NicheDE_Obj, outfile=paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241001_NicheDE/20240924_NicheDE_Test2Out_Region",xR,".txt"), num_cores = 32, batch = T, G=2)
 
 # Get P Values
 
