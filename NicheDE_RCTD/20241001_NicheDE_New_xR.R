@@ -30,8 +30,8 @@ RCTD_xR <- readRDS(paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Ni
 
 # deconv_mat (Frank)
   #RCTD <- readRDS(paste0('/Users/duboisf/Library/CloudStorage/OneDrive-Charité-UniversitätsmedizinBerlin/Liposarcoma/data/Xenium/data/20240603rctd/20240603region',xR,'_RCTD.rds'))
-  RCTD_results <- RCTD@results[["results_df"]]
-  RCTD_weights <- RCTD@results[["weights"]] # = deconvMat
+  RCTD_results <- RCTD_xR@results[["results_df"]]
+  RCTD_weights <- RCTD_xR@results[["weights"]] # = deconvMat
 
 # Create Dummy variable Matrix
 
@@ -50,23 +50,31 @@ rownames(DummyMatrix)<-DummyMatrix$Barcode
 DummyMatrix<-DummyMatrix[,-c(1)]
 DummyMatrix <- as.matrix(DummyMatrix)
 
-# Create Average Expression Profile Matrix
+# Create Average Expression Profile Matrix (Such that Celltypes and Features which are in the reference but not in Xenium are not used)
 
+predicted.celltype <- as.data.frame(as.data.table(Ref_Raw$wat.im_pred, names(Ref_Raw$wat.im_pred), row.names=NULL))
 query.counts<- t(GetAssayData(Ref_Raw, assay = "RNA", slot = "counts"))
-query.counts_onlyXen <- query.counts[,which(colnames(query.counts) %in% rownames(SeuratObj))]
-predicted.celltype <- as.data.table(Ref_Raw$wat.im_pred, names(Ref_Raw$wat.im_pred))
-aveExpL= CreateLibraryMatrix(as.data.frame(query.counts_onlyXen),as.data.frame(predicted.celltype))
+query.counts_onlyXen_Features <- query.counts[,which(colnames(query.counts) %in% rownames(SeuratObj))]
+onlyXen_CT <- unique(RCTD_xR@results$results_df$first_type)
+inCT <- which(predicted.celltype[,2] %in% onlyXen_CT)
+predicted.celltype_onlyXen_CT <- predicted.celltype[inCT,]
+query.counts_onlyXen_CT_Features <- query.counts_onlyXen_Features[which(rownames(query.counts_onlyXen_Features) %in% predicted.celltype_onlyXen_CT$V1),]
+aveExpL= CreateLibraryMatrix(as.data.frame(query.counts_onlyXen_CT_Features),as.data.frame(predicted.celltype_onlyXen_CT))
+
+# Sort RCTD weights to facilitate NDE Object creation
+
+RCTD_weights_sorted <- RCTD_weights[, rownames(aveExpL)]
 
 # Create NicheDE Object
 
 Counts_Mat <- t(GetAssayData(SeuratObj, assay = "Xenium", slot = "counts"))
 Counts_Mat <- as.matrix(Counts_Mat)
-Counts_Mat_Cropped <- subset(Counts_Mat, rownames(Counts_Mat) %in% rownames(DummyMatrix))
+Counts_Mat_Cropped <- subset(Counts_Mat, rownames(Counts_Mat) %in% rownames(RCTD_weights))
 
 Coordinates_Mat <- GetTissueCoordinates(SeuratObj)
 rownames(Coordinates_Mat)<-Coordinates_Mat[,3]
 Coordinates_Mat <- Coordinates_Mat[,-c(3)]
-Coordinates_Mat_Cropped <- subset(Coordinates_Mat, rownames(Coordinates_Mat) %in% rownames(DummyMatrix))
+Coordinates_Mat_Cropped <- subset(Coordinates_Mat, rownames(Coordinates_Mat) %in% rownames(RCTD_weights))
 
 AvgDistRectangle <- function(CoordsMat){
   NCells <- nrow(CoordsMat)
@@ -85,7 +93,7 @@ Kernel <- floor(AvgDistRectangle(Coordinates_Mat_Cropped))
 Kernel.lower <- floor(Kernel/10)
 Kernel.upper <- floor(Kernel*3)
 
-NicheDE_Obj <- CreateNicheDEObject(Counts_Mat_Cropped, Coordinates_Mat_Cropped, aveExpL, DummyMatrix, c(Kernel.lower,Kernel,Kernel.upper))
+NicheDE_Obj <- CreateNicheDEObject(Counts_Mat_Cropped, Coordinates_Mat_Cropped, aveExpL, RCTD_weights_sorted, c(Kernel.lower,Kernel,Kernel.upper))
 
 NicheDE_Obj = CalculateEffectiveNicheLargeScale(NicheDE_Obj,batch_size = 1000, cutoff = 0.05)
 
