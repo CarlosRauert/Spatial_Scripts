@@ -28,6 +28,11 @@ RCTD_xR <- readRDS(paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Ni
 
 ###Step 4: Reformat results into a matrix 
 
+# deconv_mat (Frank)
+  #RCTD <- readRDS(paste0('/Users/duboisf/Library/CloudStorage/OneDrive-Charité-UniversitätsmedizinBerlin/Liposarcoma/data/Xenium/data/20240603rctd/20240603region',xR,'_RCTD.rds'))
+  RCTD_results <- RCTD@results[["results_df"]]
+  RCTD_weights <- RCTD@results[["weights"]] # = deconvMat
+
 # Create Dummy variable Matrix
 
 RCTD_OnlyName_Celltype <- as.data.frame(rownames(RCTD_xR@results$results_df))
