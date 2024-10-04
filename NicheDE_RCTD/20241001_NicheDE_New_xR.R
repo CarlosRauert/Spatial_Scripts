@@ -1,9 +1,11 @@
-library(Seurat)
-library(spacexr)
-library(nicheDE)
+
 library(data.table)
 library(Matrix)
 library(parallel)
+library(doParallel)
+library(Seurat)
+library(spacexr)
+library(nicheDE)
 xR <- 1
 
 Args <- commandArgs(trailingOnly=TRUE)
@@ -126,10 +128,12 @@ NicheDE_Obj = CalculateEffectiveNicheLargeScale(NicheDE_Obj,batch_size = 1000, c
 
 saveRDS(NicheDE_Obj, paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241003_NicheDE_Obj_PostEffNiche/20241003_NDE_PostEffNiche_R",xR,".rds"))
 
+Frank_Obj <- readRDS("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241003_NicheDE_Obj_PostEffNiche/20240617NDEobj_postEffniche.rds")
+
 NicheDE_Obj <- readRDS(paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241003_NicheDE_Obj_PostEffNiche/20241003_NDE_PostEffNiche_R",xR,".rds"))
 # Perform Niche-DE
 
-NicheDE_Obj = niche_DE(NicheDE_Obj, outfile=paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241001_NicheDE/20240924_NicheDE_Test2Out_Region",xR,".txt"), num_cores = 32, batch = T, G=2)
+NicheDE_Obj = niche_DE(Frank_Obj, outfile=paste0("/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241001_NicheDE/20240924_NicheDE_TestFRankOut_Region",xR,".txt"), num_cores = 8, batch = T, G=1)
 
 # Get P Values
 

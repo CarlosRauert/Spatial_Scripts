@@ -69,7 +69,7 @@ res_cell_type_level_clean <- res_cell_type_level[rowSums(is.na(res_cell_type_lev
 res_cell_type_level_clean_idx <- res_cell_type_level_clean < 0.05
 res_cell_type_level_clean_sig <- res_cell_type_level_clean[rowSums(res_cell_type_level_clean_idx, na.rm = T) > 0, ]
 idxC <- colnames(res_cell_type_level_clean_sig) %in% c("B cell", "dendritic cell" , "fat cell", "immature NK T cell", "macrophage" , "monocyte", "preadipocyte",  "T cell")
-res_cell_type_level_clean_idx <- res_cell_type_level_clean < 1e-12
+res_cell_type_level_clean_idx <- res_cell_tydpe_level_clean < 1e-12
 res_cell_type_level_clean_sig2 <- res_cell_type_level_clean[rowSums(res_cell_type_level_clean_idx[, idxC], na.rm = T) > 0, idxC]
 write.csv2(res_cell_type_level_clean_sig2, '/Users/duboisf/Library/CloudStorage/OneDrive-Charité-UniversitätsmedizinBerlin/Liposarcoma/data/Xenium/data/20240617nicheDE/20240617spatialDEgenes_by_cell.csv', row.names = F)
 
