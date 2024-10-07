@@ -7,4 +7,4 @@
 conda init
 conda activate NicheDE
 
-$HOME/work/Scripts_Git_Repos/Spatial_Scripts/CellCharter/20241007_NicheDE_Slurm.R
+Rscript $HOME/work/Scripts_Git_Repos/Spatial_Scripts/CellCharter/20241007_NicheDE_Slurm.R

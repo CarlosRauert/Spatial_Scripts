@@ -75,29 +75,10 @@ NDE_obj_list <- lapply(c(1,2,3,4,5,6,7,9), function(xR){
                             sigma = c(1,100,250))
 })
 
-# 4. merge with other objects ####
+# Only Region 3
 
-NDE_obj_m <- MergeObjects(NDE_obj_list)
-
-# 5. Calculate Effective Niche ####
-
-NDE_obj_m = CalculateEffectiveNicheLargeScale(NDE_obj_m,batch_size = 1000, cutoff = 0.05)
-saveRDS(NDE_obj_m, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_m_postEffniche.rds')
-
-# 6. Perform Niche-DE ####
-
-NDE_obj_m <- readRDS('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_m_postEffniche.rds')
-
-#NDE_obj_m = niche_DE_no_parallel(NDE_obj_m,C = 30, M = 10, gamma = 0.8,print = T, Int = T, batch = T,self_EN = F)
-NDE_obj_m = niche_DE(NDE_obj_m,num_cores = 8, outfile = "",C = 30, M = 10, gamma = 0.8,print = T, Int = T, batch = T,self_EN = F,G = 1)
-
-saveRDS(NDE_obj_m, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_m_postNDE.rds')
-
-# Only Region 2
-
-NDE_obj_R2 <- NDE_obj_list[[2]]
-NDE_obj_R2 <- CalculateEffectiveNicheLargeScale(NDE_obj_R2,batch_size = 1000, cutoff = 0.05)
-saveRDS(NDE_obj_R2, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_R2_postEffniche.rds')
-NDE_obj_R2 = niche_DE(NDE_obj_R2,num_cores = 10, outfile = "",C = 30, M = 10, gamma = 0.8,print = T, Int = T, batch = T,self_EN = F,G = 1)
-saveRDS(NDE_obj_R2, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_R2_postNDE.rds')
-
+NDE_obj_R3 <- NDE_obj_list[[3]]
+NDE_obj_R3 <- CalculateEffectiveNicheLargeScale(NDE_obj_R3,batch_size = 1000, cutoff = 0.05)
+saveRDS(NDE_obj_R3, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_R3_postEffniche.rds')
+NDE_obj_R3 = niche_DE(NDE_obj_R3,num_cores = 16, outfile = "",C = 30, M = 10, gamma = 0.8,print = T, Int = T, batch = T,self_EN = F,G = 1)
+saveRDS(NDE_obj_R3, '/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/Niche_DE_Rang20/20241007_NicheDE/20241007NDEobj_R3_postNDE.rds')
