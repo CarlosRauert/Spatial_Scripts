@@ -10,7 +10,8 @@ adata.obs <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20240923c
 countMtx <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20240923cellcharterXenium_auto_k2_k20/20240924_cc_adata_LS_Xenium_k11k5clstrd_CountMat_.csv')
 countMtx[1:10, 1:10]
 table(adata.obs$sample)
-table(adata.obs$spatial_cluster)
+colnames(adata.obs)
+table(adata.obs$spatial_cluster_k11)
 
 genes_dt <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20240923cellcharterXenium_auto_k2_k20/20240924_cc_LS_Xenium_k11k5clstrd_adata.var_.csv')
 #countMtx[, cell_ID := adata.obs$cell_id]
@@ -21,22 +22,10 @@ countMtx_fdt[, cell_ID := adata.obs$cell_id]
 colSums(countMtx[-1, ])
 
 #region loop
-#xR = 'Region_10'
+xR = 2
 resall_dt <- rbindlist(lapply(1:9, function(xR){
   print(xR)
   adata.obs_xR <- adata.obs[sample == xR]
-  # if (xR == 2)  { 
-  #   DDLSniche = 7
-  #   WDLSniche = 6
-  # }
-  # if (xR %in% c(3))  { 
-  #   DDLSniche = 0
-  #   WDLSniche = 6
-  # }
-  # if (xR == 4)  { 
-  #   DDLSniche = c(4)
-  #   WDLSniche = 5
-  # }
   # get preadipocytes
   Preadipo.counts_xR_WDLS <- countMtx_fdt[cell_ID %in% adata.obs_xR[cell_types == 'ASPC' & subtype == 'WDLS', cell_id]]
   Preadipo.counts_xR_DDLS <- countMtx_fdt[cell_ID %in% adata.obs_xR[cell_types == 'ASPC' & grepl(pattern = 'DDLS', x = subtype), cell_id]]
