@@ -210,3 +210,74 @@ Counts_int_dt <- rbindlist(mclapply(unique(c(bulktests[(meanCount_Niche_WDLS >1 
                     
 # run pathway enrichment analysis
 
+#install.packages("BiocManager")
+#BiocManager::install("clusterProfiler")
+#BiocManager::install("org.Hs.eg.db")  # for human gene annotation
+#BiocManager::install("DOSE")          # for disease ontology enrichment (optional)
+#BiocManager::install("enrichplot")
+
+# Example: A named vector where names are genes and values are log2 fold changes
+
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(enrichplot)
+library(data.table)
+
+Merged_Fisher_MeanFC <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC.csv', sep=";")
+gene_names <- Merged_Fisher_MeanFC$xG
+fold_changes <- Merged_Fisher_MeanFC$mean_log2FC
+gene_list <- setNames(fold_changes, gene_names)
+
+
+genes_entrez <- bitr(names(gene_list), fromType = "SYMBOL", 
+                     toType = "ENTREZID", OrgDb = org.Hs.eg.db)
+# Merge the Entrez IDs with fold changes
+gene_list_entrez <- gene_list[genes_entrez$SYMBOL]
+names(gene_list_entrez) <- genes_entrez$ENTREZID
+kegg_enrich <- enrichKEGG(gene = names(gene_list_entrez),
+                          organism = "hsa",     # hsa = human
+                          pvalueCutoff = 0.05)
+# View results
+head(kegg_enrich)
+write.csv2(kegg_enrich, "/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC_keggEnrich.csv")
+pdf(file="/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC_keggEnrich.pdf")
+dotplot(kegg_enrich, showCategory = 10)  # Show top 10 categories
+dev.off()
+
+# Run GO enrichment analysis
+go_enrich <- enrichGO(gene = names(gene_list_entrez), 
+                      OrgDb = org.Hs.eg.db, 
+                      keyType = "ENTREZID", 
+                      ont = "BP",           # Ontology: BP = Biological Process
+                      pvalueCutoff = 0.05)
+
+# Plot results
+write.csv2(go_enrich, "/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC_enrichGO.csv")
+pdf(file="/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC_EnrichGO.pdf")
+dotplot(go_enrich, showCategory = 10)  # Show top 10 categories
+dev.off()
+
+# Run Gene Set enrichment analysis (GSEA)
+
+BiocManager::install("fgsea")
+BiocManager::install("msigdbr")  # To download gene sets (e.g., KEGG, Reactome)
+library(fgsea)
+library(msigdbr)
+gene_list <- sort(gene_list, decreasing = TRUE)
+pathways <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "KEGG")
+pathways_list <- split(pathways$entrez_gene, pathways$gs_name)
+
+gene_entrez <- bitr(names(gene_list), fromType = "SYMBOL", 
+                    toType = "ENTREZID", OrgDb = org.Hs.eg.db)
+
+# Rebuild the gene list using Entrez IDs
+gene_list_entrez <- gene_list[gene_entrez$SYMBOL]
+names(gene_list_entrez) <- gene_entrez$ENTREZID
+
+fgsea_res <- fgsea(pathways = pathways_list, 
+                   stats = gene_list_entrez,   # Named vector of log2 fold changes
+                   minSize = 15,               # Minimum gene set size
+                   maxSize = 500)               # Number of permutations
+
+# View results, sorted by adjusted p-value
+head(fgsea_res[order(fgsea_res$padj), ])
