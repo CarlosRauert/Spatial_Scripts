@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-#SBATCH --mem=2000G
-#SBATCH --ntasks=32
+#SBATCH --mem=800G
+#SBATCH --ntasks=12
 #SBATCH --time=2-00:00:00
 
 conda init
