@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --mem=1500G
+#SBATCH --mem=900G
 #SBATCH --ntasks=32
 #SBATCH --time=2-00:00:00
 
