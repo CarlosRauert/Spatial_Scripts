@@ -223,7 +223,6 @@ library(clusterProfiler)
 library(enrichplot)
 library(data.table)
 
-Merged_Fisher_MeanFC <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC.csv', sep=";")
 BulkTests <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004regionsAll_bulktests_DDLSvsWDLS.csv')
 
 # Bulk
@@ -344,6 +343,8 @@ dev.off()
 
 #Fisher
 
+Merged_Fisher_MeanFC <- fread('/data/cephfs-2/unmirrored/projects/liposarcoma-wgs/20241004_CellCharter_Xenium/ASPC_WDvsDD_no1_8/20241004_mergedFisher_DDLSvsWDLS_mean_log2FC.csv', sep=";")
+
 gene_names <- Merged_Fisher_MeanFC$xG
 fold_changes <- Merged_Fisher_MeanFC$mean_log2FC
 gene_list <- setNames(fold_changes, gene_names)
@@ -354,6 +355,12 @@ genes_entrez <- bitr(names(gene_list), fromType = "SYMBOL",
 # Merge the Entrez IDs with fold changes
 gene_list_entrez <- gene_list[genes_entrez$SYMBOL]
 names(gene_list_entrez) <- genes_entrez$ENTREZID
+# get upregd and downreg genes
+gene_list_entrez_up <- gene_list_entrez[which(gene_list_entrez>0)]
+gene_list_entrez_down <- gene_list_entrez[which(gene_list_entrez<0)]
+
+#upreg'd
+
 kegg_enrich <- enrichKEGG(gene = names(gene_list_entrez),
                           organism = "hsa",     # hsa = human
                           pvalueCutoff = 0.05)
