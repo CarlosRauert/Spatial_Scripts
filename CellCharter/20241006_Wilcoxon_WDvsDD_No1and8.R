@@ -185,7 +185,8 @@ dev.off()
 
 # indivCounts ####
 idxA <- colnames(adata.obs) %in% c("cell_id" ,"subtype", "cell_types" ,"sample")
-xG = 'PDGFRA'
+xG = 'MEDAG'
+xG = 'PLIN4'
 Counts_int_dt <- rbindlist(mclapply(unique(c(bulktests[(meanCount_Niche_WDLS >1 | meanCount_Niche_DDLS > 1) & q_val < 0.1 & (log2FC >1 | log2FC < -1) , xmG], 
                                            res_merged[(mean_log2FC >1 | mean_log2FC < -1) & (meanCount_Niche_WDLS >1 | meanCount_Niche_DDLS > 1), xG]
                                            , 'MDM2')), function(xG){
