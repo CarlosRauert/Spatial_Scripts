@@ -6,7 +6,7 @@ expression_matrix <- ReadMtx(
 seurat_object <- CreateSeuratObject(counts = expression_matrix)
 saveRDS(seurat_object,"/data/cephfs-2/unmirrored/projects/lipomap/LPS_Atlas/GSE221493_sc_LPS_atlas.rds")
 
-seurat_object<-readRDS("/data/cephfs-2/unmirrored/projects/lipomap/LPS_Atlas/GSE221493_sc_LPS_atlas.rds")
+seuratd_object<-readRDS("/data/cephfs-2/unmirrored/projects/lipomap/LPS_Atlas/GSE221493_sc_LPS_atlas.rds")
 
 #ColSums to determine whether only integers
 Cols <- colSums(as.matrix(seurat_object@assays$RNA$counts))

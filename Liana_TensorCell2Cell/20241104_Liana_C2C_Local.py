@@ -1,4 +1,4 @@
-C:\ProgramData\miniforge3\Scripts\activate
+
 
 import cell2cell as c2c
 import decoupler as dc
@@ -12,6 +12,11 @@ import squidpy as sq
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import muon as mu
+import mofax as mofa
+
+import plotnine as p9
+
 from scipy.spatial.distance import squareform
 import warnings
 warnings.filterwarnings('ignore')
@@ -20,6 +25,9 @@ output_folder = 'C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/2
 c2c.io.directories.create_directory(output_folder)
 
 #Load data
+#Similar to the tutorial of using LIANA and MISTy, we will use an ischemic 10X Visium spatial slide from Kuppe et al., 2022. 
+#It is a tissue sample obtained from a patient with myocardial infarction, specifically focusing on the ischemic zone of the heart tissue.
+#The slide provides spatially-resolved information about the cellular composition and gene expression patterns within the tissue.
 
 adata = sc.read("C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/AnnData/20240924cc_adata_LS_Xenium_k11k5clstrd.h5ad")
 adata
@@ -36,9 +44,7 @@ adata
 #sc.pp.log1p(adata)
 #Visualize spot clusters or niches. These niches were defined by clustering spots from their cellular composition deconvoluted by using cell2location (Kuppe et al., 2022).
 
-# Filter use only region 2 for testing
-
-adata_r2=adata[adata.obs['sample'] == "2"].copy()
+# CellphoneDB
 
 sq.pl.spatial_scatter(
     adata,
@@ -152,12 +158,12 @@ tensor.sparsity_fraction()
 
 c2c.analysis.run_tensor_cell2cell_pipeline(tensor,
                                            meta_tensor,
-                                           rank=8, # Number of factors to perform the factorization. If None, it is automatically determined by an elbow analysis
+                                           rank=None, # Number of factors to perform the factorization. If None, it is automatically determined by an elbow analysis
                                            tf_optimization='regular', # To define how robust we want the analysis to be.
                                            random_state=0, # Random seed for reproducibility
                                            device='cpu', # Device to use. If using GPU and PyTorch, use 'cuda'. For CPU use 'cpu'
                                            cmaps=['plasma', 'Dark2_r', 'Set1', 'Set1'],
-                                           output_folder=output_folder, # Whether to save the figures in files. If so, a folder pathname must be passed
+                                           output_folder="C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/elbow", # Whether to save the figures in files. If so, a folder pathname must be passed"
                                           )
 #Running Tensor Factorization
 #Generating Outputs
@@ -178,9 +184,9 @@ for f in factor_names:
     adata_r2.obs[f] = adata_r2.obs['spatial_cluster_k11'].apply(lambda x: float(tensor.factors['Contexts'][f].to_dict()[x]))
     adata_r2.obs[f] = pd.to_numeric(adata_r2.obs[f])
 # These columns are used for coloring the tissue regions to associate them with each factor
-sq.pl.spatial_scatter(adata_r2, color=[None, 'cell_types']+factor_names, size=1.3, cmap='Blues', vmin=0., img=None, library_key="sample", spatial_key="spatial", library_id='2')
+sq.pl.spatial_scatter(adata_r2, color=factor_names, size=4, vmin=0., img=None,cmap="coolwarm", library_key="sample", spatial_key="spatial", library_id='2')
 plt.suptitle(f'interactions by Cellcharter Cluster', fontsize=32, ha='left')
-plt.savefig("C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/20241022_R2_Tensors.pdf")
+plt.savefig("C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/elbow/20241022_R2_Tensors_elbow.pdf")
 #../../_images/notebooks_ccc_python_S4_Spatial-Decomposition_52_1.png
 #For example, we can take Factor 5 here, and see that regions in the top area of the tissue, and the bottom left corner are associated with the CCC pattern. 
 #Here, main interacting spots are niches 1 and 2 (mainly composed of cardiomyocytes and endothelial cells), coinciding with the areas where they are mainly located.
@@ -192,9 +198,12 @@ _ = c2c.plotting.loading_clustermap(loadings=tensor.factors['Ligand-Receptor Pai
                                     loading_threshold=0.1,
                                     use_zscore=False,
                                     figsize=(28, 8),
-                                    filename=None,
+                                    filename="C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/elbow/20241022_R2_Tensors_LRpairs.pdf",
                                     row_cluster=False
                                    )
+
+# test for other interaction database
+
 
 #../../_images/notebooks_ccc_python_S4_Spatial-Decomposition_55_0.png
 #In factor 5, where interactions of niches 1 and 2 are associated with this CCC pattern, LR interactions such as NPPB^NPR1, THBS4^CD36, and 
@@ -206,3 +215,140 @@ _ = c2c.plotting.loading_clustermap(loadings=tensor.factors['Ligand-Receptor Pai
 #Finally, for comparing tissues from multiple patients, a 4D tensor could be built for the same tissue region across patients. So the 4th dimension would be a 
 #tissue region aligned and present across patients.
 
+
+# Consensus
+
+# Filter use only region 2 for testing
+
+adata_r2=adata[adata.obs['sample'] == "2"].copy()
+
+#Deciphering cell-cell communication
+#Here we run LIANA to compute interactions between spots or cells aggregated by their corresponding cluster/niche annotations. Interactions are 
+#computed for each spatial context (grid window) by considering only cells annotated with such spatial context in the grid_cell column in the adata.obs DataFrame.
+
+#In this case we use the CellPhoneDB list of ligand-receptor interactions, and the CellPhoneDB method to infer CCC.
+
+# use cellcharter cluster as spatial context
+
+li.mt.rank_aggregate.by_sample(
+    adata_r2,
+    groupby='cell_types',
+    resource_name='consensus', # NOTE: uses HUMAN gene symbols!
+    sample_key='spatial_cluster_k11', # sample key by which we which to loop
+    expr_prop = 0.1,
+    use_raw=False,
+    n_perms=100, # reduce permutations for speed
+    return_all_lrs=False, # we don't return all LR values to utilize MOFA's flexible views
+    verbose=True, # use 'full' to show all information
+    )
+
+
+#Now running: DDLS_R5: 100%|████████████| 7/7 [00:42<00:00,  6.07s/it] #The results are located here:
+
+spatial_liana = adata_r2.uns['liana_res']
+spatial_liana
+#     spatial_cluster_k11 ligand ligand_complex  ligand_means  ligand_props receptor receptor_complex  receptor_means  receptor_props            source      target  lr_means  cellphone_pvals
+#0     perivascular_tumor  PTPRC          PTPRC      9.805880      0.925373     MRC1             MRC1        4.635259        0.485037            t_cell  macrophage  7.220570            0.000
+#1     perivascular_tumor  PTPRC          PTPRC      9.475180      0.902256     MRC1             MRC1        4.635259        0.485037           nk_cell  macrophage  7.055220            0.000
+#2     perivascular_tumor  PTPRC          PTPRC      8.785662      0.846154     MRC1             MRC1        4.635259        0.485037  Macrophages SPP1  macrophage  6.710461            0.000
+#3     perivascular_tumor  PTPRC          PTPRC      7.660478      0.700000     MRC1             MRC1        4.635259        0.485037       mesothelium  macrophage  6.147869            0.000
+#4     perivascular_tumor  PTPRC          PTPRC      7.539576      0.734756     MRC1             MRC1        4.635259        0.485037          monocyte  macrophage  6.087418            0.000
+#...                  ...    ...            ...           ...           ...      ...              ...             ...             ...               ...         ...       ...              ...
+#2038             DDLS_R5   EDN1           EDN1      1.868157      0.210526    EDNRB            EDNRB        1.844098        0.200000              ASPC  macrophage  1.856127            0.448
+#2039             DDLS_R5  PTPRC          PTPRC      1.728003      0.210526     MRC1             MRC1        1.414962        0.157895              ASPC        ASPC  1.571482            1.000
+#2040             DDLS_R5   CD69           CD69      1.916295      0.200000    KLRB1            KLRB1        0.907709        0.105263        macrophage        ASPC  1.412002            0.108
+#2041             DDLS_R5   CD86           CD86      1.291050      0.157895     CD28             CD28        1.347276        0.157895              ASPC        ASPC  1.319163            1.000
+#2042             DDLS_R5   CD69           CD69      0.879616      0.105263    KLRB1            KLRB1        0.907709        0.105263              ASPC        ASPC  0.893663            0.732
+
+#[2043 rows x 13 columns]
+
+#Using LIANA results to build a 4D-communication tensor, with grid windows as the contexts in the 4th dimension.
+tensor = li.multi.to_tensor_c2c(liana_res=spatial_liana, # LIANA's dataframe containing results
+                                sample_key='spatial_cluster_k11', # Column name of the samples
+                                source_key='source', # Column name of the sender cells
+                                target_key='target', # Column name of the receiver cells
+                                ligand_key='ligand_complex', # Column name of the ligands
+                                receptor_key='receptor_complex', # Column name of the receptors
+                                score_key='lr_means', # Column name of the communication scores to use
+                                inverse_fun=None, # Transformation function
+                                how='outer', # What to include across all samples
+                                outer_fraction=1/4., # Fraction of samples as threshold to include cells and LR pairs.
+                               )
+#100%|██████████████████████████████████████████████████████████████| 7/7 [00:00<00:00, 27.49it/s]#Metadata for coloring the elements in the tensor.
+
+#Here we do not assign major groups, each element is colored separately.
+
+dimensions_dict = [None, None, None, None]
+meta_tensor = c2c.tensor.generate_tensor_metadata(interaction_tensor=tensor,
+                                                  metadata_dicts=dimensions_dict,
+                                                  fill_with_order_elements=True
+                                                 )
+#Tensor properties
+
+tensor.shape
+#(7, 12, 17, 17)
+tensor.excluded_value_fraction()
+#0.9188498928983359
+tensor.sparsity_fraction()
+#0.0
+#Run Tensor-cell2cell pipeline
+#For simplicity, we factorize the tensor into 8 factors or CCC patterns instead of using the elbow analysis to determine the number of factors.
+
+c2c.analysis.run_tensor_cell2cell_pipeline(tensor,
+                                           meta_tensor,
+                                           rank=None, # Number of factors to perform the factorization. If None, it is automatically determined by an elbow analysis
+                                           tf_optimization='regular', # To define how robust we want the analysis to be.
+                                           random_state=0, # Random seed for reproducibility
+                                           device='cpu', # Device to use. If using GPU and PyTorch, use 'cuda'. For CPU use 'cpu'
+                                           cmaps=['plasma', 'Dark2_r', 'Set1', 'Set1'],
+                                           output_folder="C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/elbow", # Whether to save the figures in files. If so, a folder pathname must be passed"
+                                          )
+#Running Tensor Factorization
+#Generating Outputs
+#Loadings of the tensor factorization were successfully saved into C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/Loadings.xlsx
+#<cell2cell.tensor.tensor.PreBuiltTensor object at 0x000001E6071F3830>
+
+#Visualize CCC patterns in space
+#Each factor or CCC pattern contains loadings for the context dimension. These loadings could be mapped for each spot or cell depending on what 
+#spatial context (grid window) they belong to. Thus, we can visualize the importance of each context in each of the factors, and see how the CCC 
+#patterns behave in space.
+
+#This behavior in space is useful to understand what set of LR pairs are used by determinant sender-receiver spot pairs in each region of the tissue. 
+#Regions with higher scores, indicate that LR pairs of that factor are used more there by the senders and receivers with high loadings.
+
+# Generate columns in the adata.obs dataframe with the loading values of each factor
+factor_names = list(tensor.factors['Contexts'].columns)
+for f in factor_names:
+    adata_r2.obs[f] = adata_r2.obs['spatial_cluster_k11'].apply(lambda x: float(tensor.factors['Contexts'][f].to_dict()[x]))
+    adata_r2.obs[f] = pd.to_numeric(adata_r2.obs[f])
+# These columns are used for coloring the tissue regions to associate them with each factor
+sq.pl.spatial_scatter(adata_r2, color=factor_names, size=4, vmin=0., img=None,cmap="coolwarm", library_key="sample", spatial_key="spatial", library_id='2')
+plt.suptitle(f'interactions by Cellcharter Cluster', fontsize=32, ha='left')
+plt.savefig("C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/20241022_R2_Tensors_Consensus_elbow.pdf")
+#../../_images/notebooks_ccc_python_S4_Spatial-Decomposition_52_1.png
+#For example, we can take Factor 5 here, and see that regions in the top area of the tissue, and the bottom left corner are associated with the CCC pattern. 
+#Here, main interacting spots are niches 1 and 2 (mainly composed of cardiomyocytes and endothelial cells), coinciding with the areas where they are mainly located.
+
+#Then, using the LR pair loadings, we can also identify LR interactions that are key in each factor, and link this with the spatial region with 
+#higher scores in the same factor.
+
+_ = c2c.plotting.loading_clustermap(loadings=tensor.factors['Ligand-Receptor Pairs'],
+                                    loading_threshold=0.1,
+                                    use_zscore=False,
+                                    figsize=(28, 8),
+                                    filename="C:/Users/carlo/Documents/Charite/Promotion/PromotionSpatialLS/20241022_Liana/TensorC2C_Out/elbow/20241022_R2_Tensors_LRpairs_Consensus.pdf",
+                                    row_cluster=False
+                                   )
+
+# test for other interaction database
+
+
+#../../_images/notebooks_ccc_python_S4_Spatial-Decomposition_55_0.png
+#In factor 5, where interactions of niches 1 and 2 are associated with this CCC pattern, LR interactions such as NPPB^NPR1, THBS4^CD36, and 
+#FN1^ITGAV&ITGB1 are important.
+
+#Following the same idea, other downstream analyses could be performed (e.g., Pathway enrichment analysis, PROGENy analysis, among others - see this notebook), 
+#and use the resulting scores to associate them with important tissue regions per factor.
+
+#Finally, for comparing tissues from multiple patients, a 4D tensor could be built for the same tissue region across patients. So the 4th dimension would be a 
+#tissue region aligned and present across patients.
